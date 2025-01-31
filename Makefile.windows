@@ -1,0 +1,35 @@
+SRCDIR := src
+OBJDIR := obj
+ICODIR := ico
+SRC := $(wildcard $(SRCDIR)/*.cpp)
+OBJ := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRC))
+ICO := $(ICODIR)/ico.res
+CXXFLAGS := -std=c++17 -s -O2 -mwindows
+LDFLAGS := -lcurl -lmingw32 -lgcc -lsfml-audio -lsfml-graphics-s -lsfml-window -lsfml-system -lsfml-window-s -lsfml-system-s -lopengl32 -lfreetype -lwinmm -lgdi32 -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
+INCFLAGS := -ISFML-folder/include -ICURL-folder/include -Iinclude
+LIBFLAGS := -LSFML-folder/lib -LCURL-folder/lib
+DEFINES := -DSFML_STATIC
+
+.PHONY: test create clean
+
+all: create bin/bongo.exe
+
+bin/bongo.exe: $(OBJ) $(ICO)
+	$(CXX) -o $@ $^ $(DEFINES) $(INCFLAGS) $(LIBFLAGS) $(CXXFLAGS) $(LDFLAGS)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+	$(CXX) -c -o $@ $^ $(DEFINES) $(INCFLAGS) $(LIBFLAGS) $(CXXFLAGS) $(LDFLAGS)
+
+$(ICODIR)/ico.res: $(ICODIR)/ico.rc
+	windres -O coff -o $@ $^
+
+create:
+	mkdir $(OBJDIR) && exit 0
+	mkdir bin && exit 0
+
+test:
+	bin/bongo.exe
+
+clean:
+	del $(OBJ) && exit 0
+	del ico/ico.res && exit 0
