@@ -3,3 +3,5 @@
 *.o
 bongo
 bin/*
+SFML-folder/*
+run.bat
