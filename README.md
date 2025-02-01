@@ -30,3 +30,35 @@ Supported operating system:
 * Linux (tested with Arch Linux with WINE Staging 5). Note: You **must** use WINE Staging, because for whatever reason on stable WINE bongocat-osu doesn't register keyboard input from other windows.
 
 _Notice_: If you're using WINE on Linux, make sure that osu! and this application run in the same `WINEPREFIX`.
+
+## For developers
+This project uses [SFML](https://www.sfml-dev.org/index.php) and [JsonCpp](https://github.com/open-source-parsers/jsoncpp). JsonCpp libraries are directly included in the source using the provided `amalgamation.py` from the developers.
+
+### Libraries and dependency
+
+#### Windows and MinGW
+To build the source, download the SFML libraries [here](https://www.sfml-dev.org/index.php), edit file `Makefile.windows` then replace *`<SFML-folder>`* with your **SFML 2.5.1** folder.
+
+#### Linux (NOT TESTED FOR NOW!)
+You need to have these dependencies installed. Check with your package manager for the exact name of these dependencies on your distro:
+- g++
+- libxdo
+- sdl2
+- sfml
+- x11
+- xrandr
+
+### Building and testing
+To build, run this command from the base directory:
+
+```sh
+make
+```
+
+To test the program, run this from the base directory:
+
+```sh
+make test
+```
+
+Alternatively, you can copy the newly-compiled `bin/bongo.exe` or `bin/bongo` into the base directory and execute it.
