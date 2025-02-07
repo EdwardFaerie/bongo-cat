@@ -399,7 +399,7 @@ namespace gamer
 
         if (!microphoneFound)
         {
-            std::vector<std::string> devices = {"Device1", "Device2", "Device3"};
+            std::vector<std::string> devices = sf::SoundRecorder::getAvailableDevices();
             std::string allDevices;
             std::ostringstream oss;
 
