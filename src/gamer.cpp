@@ -1,4 +1,5 @@
 #include "header.hpp"
+#include <pocketsphinx.h>
 #include <SFML/Audio.hpp>
 #include <iostream>
 #include <vector>
@@ -6,76 +7,321 @@
 #include <algorithm>
 #include <random>
 
-bool m_istalking = false;
-bool m_istalking_loud = false;
-bool m_istalking_low = false;
-
-class MicrophoneRecorder : public sf::SoundRecorder
+namespace gamer
 {
-    virtual bool onStart() // optional
+    bool m_istalking = false;
+    bool m_istalking_loud = false;
+    bool m_istalking_low = false;
+    sf::Sprite mouthClosed;
+    Json::Value AllPhonemes = {};
+
+    struct Phoneme_Key
     {
-        std::cout << "Recording Microphone" << std::endl;
-        return true;
-    }
-    virtual bool onProcessSamples(const sf::Int16 *samples, std::size_t sampleCount)
-    {
-        float maxAmplitude = 0.0f; // Initialize to 0.0f
+        Json::Value key_value;
+        Json::Value joy_value;
+        sf::Sprite spriteLow, spriteLoud;
+        std::string phoneme;
+        bool status;
+        double timer;
 
-        std::cout << std::to_string(sampleCount) + " Samples recorded!" << std::endl;
-
-        // Iterate through each sample and find the maximum amplitude
-        for (size_t i = 0; i < sampleCount; ++i)
+        Phoneme_Key(Json::Value _key_value)
         {
-            float currentAmplitude = std::abs((samples[i]));
-            if (currentAmplitude > maxAmplitude)
+            spriteLow = sf::Sprite();
+            if (_key_value.isMember("LowVoiceimage") && _key_value["LowVoiceimage"].isString())
             {
-                maxAmplitude = currentAmplitude;
-            }
-        }
-
-        // Normalize the maximum amplitude (SFML samples are in the range of [-32768, 32767])
-        float normalizedAmplitude = (maxAmplitude / 32768.0f) * 10;
-        std::cout << "Max Amplitude: " << maxAmplitude << ", Normalized Amplitude: " << normalizedAmplitude << std::endl;
-        Json::Value custom = data::cfg["gamer"];
-
-        if (normalizedAmplitude < custom["thresholdMinMicrophone"].asDouble())
-        {
-            m_istalking = false;
-            m_istalking_loud = false;
-            m_istalking_low = false;
-        }
-        else
-        {
-            m_istalking = true;
-            if (normalizedAmplitude > custom["thresholdMicrophoneLoud"].asDouble())
-            {
-                m_istalking_loud = true;
+                spriteLow.setTexture(data::load_texture(_key_value["LowVoiceimage"].asString()));
             }
             else
             {
-                m_istalking_loud = false;
+                data::error_msg("Custom LowVoiceimage path is not set correctly", "Error reading configs");
+                throw;
+            }
 
-                if (normalizedAmplitude > custom["thresholdMicrophone"].asDouble())
+            spriteLoud = sf::Sprite();
+            if (_key_value.isMember("LoudVoiceimage") && _key_value["LoudVoiceimage"].isString())
+            {
+                spriteLoud.setTexture(data::load_texture(_key_value["LoudVoiceimage"].asString()));
+            }
+            else
+            {
+                data::error_msg("Custom LoudVoiceimage path is not set correctly", "Error reading configs");
+                throw;
+            }
+
+            phoneme = "";
+            if (_key_value.isMember("phoneme") && _key_value["phoneme"].isString())
+            {
+                phoneme = _key_value["phoneme"].isString();
+                Json::Value Var = {"Value:" + phoneme};
+                AllPhonemes.append(Var);
+            }
+            else
+            {
+                data::error_msg("Custom phoneme string is not set correctly", "Error reading configs");
+                throw;
+            }
+
+            status = false;
+            timer = -1;
+        }
+
+        void draw(std::string ValuePhoneme, std::string LoudOrLow)
+        {
+            if (ValuePhoneme == phoneme)
+            {
+                if (LoudOrLow == "Loud")
                 {
-                    m_istalking_low = true;
+                    status = true;
+                    window.draw(spriteLoud);
+                    timer = clock();
+                }
+                else if (LoudOrLow == "Low")
+                {
+                    status = true;
+                    window.draw(spriteLow);
+                    timer = clock();
+                }
+                else if (LoudOrLow == "None")
+                {
+                    window.draw(mouthClosed);
+                }
+            }
+            else
+            {
+                status = false;
+            }
+        }
+    };
+
+    struct Phoneme_containers
+    {
+        std::vector<Phoneme_Key> Phonemes;
+        sf::Sprite default_sprite;
+
+        Phoneme_containers(Json::Value key_container_value)
+        {
+            if (key_container_value.isObject())
+            {
+                for (Json::Value &child_key : key_container_value["mouths"])
+                {
+                    Phonemes.push_back(Phoneme_Key(child_key));
+                }
+            }
+            else
+            {
+                data::error_msg("costumes container must be an object", "Error reading configs");
+                throw;
+            }
+        }
+
+        void draw(std::string ValuePhoneme, std::string LoudORLow)
+        {
+            if (m_istalking)
+            {
+                for (Phoneme_Key &current : Phonemes)
+                {
+                    current.draw(ValuePhoneme, LoudORLow);
+                }
+            }
+            else
+            {
+                window.draw(mouthClosed);
+            }
+        }
+    };
+
+    std::vector<Phoneme_containers> Phoneme_container;
+
+    class MicrophoneRecorder : public sf::SoundRecorder
+    {
+    private:
+        ps_decoder_t *ps;
+        ps_config_t *config;
+
+    public:
+
+        bool onStart()
+        {
+            std::cout << "Recording Microphone" << std::endl;
+            
+            Json::Value custom = data::cfg["gamer"];
+
+            if (custom["usePhonemes"].asBool())
+            {
+                const char *model_folder = custom["model_folder"].asCString();
+                const char *dict_file = custom["dict_file"].asCString();
+                const char *lm_folder = custom["lm_file"].asCString();
+    
+                // Initialize PocketSphinx
+                config = ps_config_init(NULL);
+                ps_default_search_args(config);
+                ps_config_set_int(config, "samprate", 16000);
+                ps_config_set_int(config, "maxwpf", 40);
+    
+                ps_config_set_str(config, "hmm", model_folder);
+                ps_config_set_str(config, "dict", dict_file);
+                ps_config_set_str(config, "lm", lm_folder);
+    
+                ps = ps_init(config);
+                if (ps != NULL)
+                {
+                    std::cout << "Initialized PocketSphinx decoder!" << std::endl;
                 }
                 else
                 {
-                    m_istalking_low = false;
+                    std::cerr << "Failed to initialize PocketSphinx decoder!" << std::endl;
+                    return false;
+                }
+    
+                Json::Value AllPhonemes(Json::arrayValue);            
+                
+                for (const auto& phoneme : AllPhonemes)
+                {
+                    const char *Char = phoneme["Value"].asCString();
+                    ps_add_word(ps,NULL,Char,10);
+                    std::cout << "Phoneme: " << Char <<  " added to check list!" << std::endl;
+                }
+    
+                ps_start_utt(ps);    
+            }
+
+            return true;
+        }
+
+        bool onProcessSamples(const sf::Int16 *samples, std::size_t sampleCount)
+        {
+
+            try
+            {
+                Json::Value custom = data::cfg["gamer"];
+                bool UsePhonemes = custom["usePhonemes"].asBool();
+
+                // Existing loudness-based processing
+                float maxAmplitude = 0.0f;
+                for (size_t i = 0; i < sampleCount; ++i)
+                {
+                    float currentAmplitude = std::abs(samples[i]);
+                    if (currentAmplitude > maxAmplitude)
+                    {
+                        maxAmplitude = currentAmplitude;
+                    }
+                }
+
+                float normalizedAmplitude = (maxAmplitude / 32768.0f) * 10;
+                std::cout << "Max Amplitude: " << maxAmplitude << ", Normalized Amplitude: " << normalizedAmplitude << std::endl;
+
+                if (UsePhonemes)
+                {
+                    if (normalizedAmplitude > custom["thresholdMinMicrophone"].asDouble())
+                    {
+                        m_istalking = true;
+                        int RawProcess = ps_process_raw(ps, (const short *)samples, sampleCount, FALSE, FALSE);
+
+                        if (RawProcess < 0)
+                        {
+                            std::cerr << "Error processing audio samples!" << std::endl;
+                            return true; // Continue processing other samples
+                        }
+
+                        // Get the recognized phonemes (this is just an example of possible usage)
+                        char const *hypothesis = ps_get_hyp(ps, NULL);
+                        if (hypothesis != NULL && strlen(hypothesis) > 0)
+                        {
+                            std::cout << "Phoneme Recognized: " << hypothesis << std::endl;
+                            // Process the recognized phoneme
+
+                            std::string StringSaid = hypothesis;
+                            if (normalizedAmplitude > custom["thresholdMicrophoneLoud"].asDouble())
+                            {
+                                for (Phoneme_containers &current : Phoneme_container)
+                                {
+                                    current.draw(StringSaid, "Loud");
+                                }
+                            }
+                            else
+                            {
+                                if (normalizedAmplitude > custom["thresholdMicrophone"].asDouble())
+                                {
+                                    for (Phoneme_containers &current : Phoneme_container)
+                                    {
+                                        current.draw(StringSaid, "Low");
+                                    }
+                                }
+                                else
+                                {
+                                    for (Phoneme_containers &current : Phoneme_container)
+                                    {
+                                        current.draw("", "None");
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            std::cerr << "No phoneme recognized!" << std::endl;
+                        }
+                    }
+                    else
+                    {
+                        m_istalking = false;
+                    }
+                }
+                else
+                {
+
+                    if (normalizedAmplitude < custom["thresholdMinMicrophone"].asDouble())
+                    {
+                        m_istalking = false;
+                        m_istalking_loud = false;
+                        m_istalking_low = false;
+                    }
+                    else
+                    {
+                        m_istalking = true;
+                        if (normalizedAmplitude > custom["thresholdMicrophoneLoud"].asDouble())
+                        {
+                            m_istalking_loud = true;
+                        }
+                        else
+                        {
+                            m_istalking_loud = false;
+
+                            if (normalizedAmplitude > custom["thresholdMicrophone"].asDouble())
+                            {
+                                m_istalking_low = true;
+                            }
+                            else
+                            {
+                                m_istalking_low = false;
+                            }
+                        }
+                    }
                 }
             }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Exception caught: " << e.what() << std::endl;
+            }
+            catch (...)
+            {
+                std::cerr << "Unknown error occurred!" << std::endl;
+            }
+            return true;
         }
-        return true;
-    }
 
-    virtual void onStop() // optional
-    {
-        std::cout << "Stopped Recording Microphone" << std::endl;
-    }
-};
+        void onStop()
+        {
+            std::cout << "Stopped Recording Microphone" << std::endl;
+            // Clean up PocketSphinx
+            if (ps != nullptr)
+            {
+                ps_free(ps);
+                ps_config_free(config);
+                ps = nullptr;
+            }
+        }
+    };
 
-namespace gamer
-{
     bool recorderBool = false;
 
     struct key
@@ -346,7 +592,7 @@ namespace gamer
 
     std::vector<key_container> key_containers;
     std::vector<costumes_container> costumes_containers;
-    sf::Sprite keyboard, mic, cat, desk, mouse, mousePad, mouthOpen, mouthlowOpen, mouthClosed, noMouseHand, noKeyboardHand;
+    sf::Sprite keyboard, mic, cat, desk, mouse, mousePad, mouthOpen, mouthlowOpen, noMouseHand, noKeyboardHand;
     sf::Sprite catCostume1, catCostume2, catCostume3, background, openEyeSprite, ClosedEyeSprite;
 
     MicrophoneRecorder recorder;
@@ -481,6 +727,12 @@ namespace gamer
             {
                 data::error_msg("Microphone error. Check 'MicrophonesList.txt' in bongo.exe folder", "Error with microphone");
                 return false;
+            }
+            
+            Phoneme_container.clear();
+            for (Json::Value &current_key_container : custom["mouthsContainer"])
+            {
+                Phoneme_container.push_back(Phoneme_containers(current_key_container));
             }
 
             is_Keyboard = custom["keyboard"].asBool();
@@ -692,28 +944,33 @@ namespace gamer
             window.draw(mousePad);
         }
 
+        Json::Value custom = data::cfg["gamer"];
+        bool use_phonemes = custom["usePhonemes"].asBool();
+
         if (is_mouth)
         {
-            
-            if (m_istalking && !m_istalking_loud && !m_istalking_low)
+            if (!use_phonemes)
             {
-                window.draw(mouthlowOpen); // Display Low mouth open when talking
-            }
-            else if (m_istalking && m_istalking_loud)
-            {
-                window.draw(mouthOpen); // Display Loud mouth open when talking
-            }
-            else if (m_istalking && m_istalking_low)
-            {
-                window.draw(mouthlowOpen); // Display low mouth open when talking
-            }
-            else if (m_istalking && m_istalking_loud && m_istalking_low)
-            {
-                window.draw(mouthOpen); // Display Loud mouth open when talking
-            }
-            else if (!m_istalking)
-            {
-                window.draw(mouthClosed); // Display mouth closed when quiet
+                if (m_istalking && !m_istalking_loud && !m_istalking_low)
+                {
+                    window.draw(mouthlowOpen); // Display Low mouth open when talking
+                }
+                else if (m_istalking && m_istalking_loud)
+                {
+                    window.draw(mouthOpen); // Display Loud mouth open when talking
+                }
+                else if (m_istalking && m_istalking_low)
+                {
+                    window.draw(mouthlowOpen); // Display low mouth open when talking
+                }
+                else if (m_istalking && m_istalking_loud && m_istalking_low)
+                {
+                    window.draw(mouthOpen); // Display Loud mouth open when talking
+                }
+                else if (!m_istalking)
+                {
+                    window.draw(mouthClosed); // Display mouth closed when quiet
+                }
             }
         }
         else

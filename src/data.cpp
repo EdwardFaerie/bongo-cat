@@ -26,7 +26,7 @@ void create_config() {
             "3": "ctb, catch game.",
             "4": "Mania, Mania games.",
             "5": "Custom, a custom mode.",
-            "6": "Gamer, Has a lot of customization, from costumes, background, custom desk, microphone sound compatibility, etc."
+            "6": "Gamer, it has different settings, from unlimited customizable costumes, customizable background, customizable desk, mouth movement with microphone sound compatibility and many others."
         }
     ],
     "mode": 6,
@@ -43,7 +43,7 @@ void create_config() {
         "offsetX": [0, 11],
         "offsetY": [0, -65],
         "scalar": [1.0, 1.0],
-        "fpsSensitivity" : 2.0,
+        "fpsSensitivity" : 1.0,
         "fpsReturnSpeed" : 50
     },
     "osu": {
@@ -173,7 +173,41 @@ void create_config() {
         "mouthLoudVoiceOpen": "img/gamer/mouthopen.png",
         "mouthLowVoiceOpen": "img/gamer/mouthlowopen.png",
         "mouthClosed": "img/gamer/mouthclosed.png",
-
+        
+        "usePhonemes": true,
+        "mouthsContainer": [
+            {
+                "defaultMouthClosed": "img/gamer/mouthclosed.png",
+                "mouths": [
+                    {
+                        "LowVoiceimage": "img/gamer/mouthlowopen.png",
+                        "LoudVoiceimage": "img/gamer/mouthopen.png",
+                        "phoneme": "A"
+                    },
+                    {
+                        "LowVoiceimage": "img/gamer/mouthlowopen.png",
+                        "LoudVoiceimage": "img/gamer/mouthopen.png",
+                        "phoneme": "E"
+                    },
+                    {
+                        "LowVoiceimage": "img/gamer/mouthlowopen.png",
+                        "LoudVoiceimage": "img/gamer/mouthopen.png",
+                        "phoneme": "I"
+                    },
+                    {
+                        "LowVoiceimage": "img/gamer/mouthlowopen.png",
+                        "LoudVoiceimage": "img/gamer/mouthopen.png",
+                        "phoneme": "O"
+                    },
+                    {
+                        "LowVoiceimage": "img/gamer/mouthlowopen.png",
+                        "LoudVoiceimage": "img/gamer/mouthopen.png",
+                        "phoneme": "U"
+                    }
+                ]
+            }
+        ],
+        
         "MicrophoneChannel": "OpenAL Soft on Microphone (Usb Audio Device)",
         "thresholdMinMicrophone": 5,
         "thresholdMicrophone": 6,

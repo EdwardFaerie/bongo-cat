@@ -1,13 +1,14 @@
+CXX := g++
 SRCDIR := src
 OBJDIR := obj
 ICODIR := ico
 SRC := $(wildcard $(SRCDIR)/*.cpp)
 OBJ := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRC))
 ICO := $(ICODIR)/ico.res
-CXXFLAGS := -std=c++17 -s -O2 -mwindows
-LDFLAGS := -lmingw32 -lgcc -lsfml-audio -lsfml-graphics-s -lsfml-window -lsfml-system -lsfml-window-s -lsfml-system-s -lopengl32 -lfreetype -lwinmm -lgdi32 -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
-INCFLAGS := -ISFML-folder/include -Iinclude
-LIBFLAGS := -LSFML-folder/lib
+CXXFLAGS := -std=c++17 -s -O2 -mwindows -DDEBUG -g
+LDFLAGS := -Wl,-Bstatic -lpocketsphinx -lmingw32 -lgcc -lsfml-audio -lsfml-graphics-s -lsfml-window -lsfml-system -lsfml-window-s -lsfml-system-s -lopengl32 -lfreetype -lwinmm -lgdi32 -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
+LIBFLAGS := -LSFML-folder/lib -LCURL-folder/lib -LSphinx-folder/lib
+INCFLAGS := -ISFML-folder/include -ISphinx-folder/include -ICURL-folder/include -Iinclude
 DEFINES := -DSFML_STATIC
 
 .PHONY: test create clean
